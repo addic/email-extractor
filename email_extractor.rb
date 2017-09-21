@@ -129,7 +129,8 @@ class EmailExtractor
   end
 
   def absolute_url(url)
-    url =~ /http|www/ ? url : "#{@main_url}/#{url}"
+    url = url =~ /http|https|www/ ? url : "#{@main_url}/#{url}"
+    url.gsub %r{(?<=.{7})//+}, '/'
   end
 
   def contact_link_translations
