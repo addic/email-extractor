@@ -23,11 +23,16 @@ class EmailExtractor
     http|www/
   }x
 
-  def initialize(url, silent_mode = true, debug = false, result_separator = ',')
+  def initialize(url, first_only: false, silent_mode: true, debug: false, result_separator: ',')
     @main_url = url
     @silent_mode = silent_mode
     @debug = debug
     @multiple_result_separator = result_separator
+    @first_only = first_only
+    @result = {
+      emails: [],
+      locations: []
+    }
   end
 
   def find_email
@@ -51,6 +56,9 @@ class EmailExtractor
     search_email_in_text
     search_menu_for_contacts_link
     scan_all_web_links
+    return if @result[:emails].empty? && @result[:locations].empty?
+    raise FoundEmail.new(@result[:locations].uniq.join(', ')),
+          @result[:emails].uniq.join("#{@multiple_result_separator} ")
   end
 
   def search_for_mailto_links(page = nil)
@@ -61,8 +69,9 @@ class EmailExtractor
 
     emails = links.map do |link|
       link.text =~ EMAIL_REGEX ? link.text : link['href'][EMAIL_REGEX]
-    end
-    raise FoundEmail.new('mailto links'), emails.uniq.join("#{@multiple_result_separator} ")
+    end.uniq.join("#{@multiple_result_separator} ")
+
+    set_result emails, 'mailto links'
   end
 
   def search_email_in_text(page = nil)
@@ -72,7 +81,8 @@ class EmailExtractor
     return if emails.nil? || emails.empty?
     emails.reject { |e| e =~ /ajax-loader@2x.gif/ }
     return if emails.empty?
-    raise FoundEmail.new('whole page text'), emails.uniq.join("#{@multiple_result_separator} ")
+
+    set_result emails.uniq.join("#{@multiple_result_separator} "), 'whole page text'
   end
 
   def search_menu_for_contacts_link
@@ -138,6 +148,13 @@ class EmailExtractor
     @_contact_link_translations = CONTACT_LINK_TRANSLATIONS.map do |word|
       [word, word.upcase, word.capitalize]
     end.flatten
+  end
+
+  def set_result(emails, location)
+    @result[:emails].push emails
+    @result[:locations].push location
+    debug(">>> set result: #{@result}")
+    raise FoundEmail.new(location), emails if @first_only
   end
 
   def debug(message)
