@@ -116,19 +116,28 @@ class EmailExtractor
     search_email_in_text page
   end
 
+  @open_page_retries = 0
   def try_open_page(url)
-    open_page(url)
+    page = open_page(url)
+    @open_page_retries = 0
+    return page
   rescue OpenSSL::SSL::SSLError,
-         Errno::ENOENT, Errno::ECONNREFUSED,
+         Errno::ENOENT, Errno::ECONNREFUSED, Errno::ECONNRESET,
          URI::InvalidURIError, OpenURI::HTTPError,
          Net::ReadTimeout, Net::OpenTimeout,
          SocketError, Zlib::DataError => e
     raise unless @silent_mode
     debug(">>> Error: #{e.message}")
+    if e.respond_to?(:io) && e.io.status[0] == '429'
+      @open_page_retries += 1
+      sleep 2
+      return try_open_page(url) if @open_page_retries < 3
+    end
     nil
   rescue RuntimeError => e
     raise unless @silent_mode || e.message.scan('HTTP redirection loop').empty?
     debug(">>> Error: #{e.message}")
+    @open_page_retries = 0
     nil
   end
 
