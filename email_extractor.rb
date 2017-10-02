@@ -19,6 +19,7 @@ class EmailExtractor
   IGNORE_LINKS = %r{
     #|
     facebook|linkedin|google|twitter|youtube|flickr|
+    /blog|
     javascript|
     http|www/
   }x
